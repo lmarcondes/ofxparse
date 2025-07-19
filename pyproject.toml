@@ -1,0 +1,43 @@
+[tool.poetry]
+name = "ofxparse"
+# Using dynamic versioning, so leave this blank
+version = "0.0.0"
+description = "Tools for working with the OFX (Open Financial Exchange) file format"
+authors = ["Lucas Marcondes <lucasnascimento95@gmail.com>"]
+classifiers = [
+  "Development Status :: 4 - Beta",
+  "Intended Audience :: Developers",
+  "Natural Language :: English",
+  "Operating System :: OS Independent",
+  "Programming Language :: Python :: 2.7",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.4",
+  "Programming Language :: Python :: 3.5",
+  "Programming Language :: Python :: 3.6",
+  "Topic :: Software Development :: Libraries :: Python Modules",
+  "Topic :: Utilities",
+  "License :: OSI Approved :: MIT License",
+]
+keywords = ['ofx', ' Open Financial Exchange', ' file formats']
+readme = "README.rst"
+license = 'MIT License'
+
+[tool.poetry.dependencies]
+python = "^3.10"
+six = "^1.0"
+lxml = "^5.0"
+beautifulsoup4 = "^4.0"
+python-coveralls = "^2.0"
+
+[tool.poetry.extras]
+dev = ["debugpy", "ipython"]
+
+[tool.poetry-dynamic-versioning]
+enable = true
+vcs = "git"
+style = "pep440"
+bump = true
+
+[build-system]
+requires = ["poetry-core>=1.0.0", "poetry-dynamic-versioning>=1.0.0,<2.0.0"]
+build-backend = "poetry_dynamic_versioning.backend"
