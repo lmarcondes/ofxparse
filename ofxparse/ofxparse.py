@@ -1,49 +1,36 @@
 from __future__ import absolute_import
 
-import sys
-import decimal
-import datetime
 import codecs
-import re
 import collections
 import contextlib
-
-try:
-    from StringIO import StringIO
-except ImportError:
-    from io import StringIO
-
-try:
-    from collections.abc import Iterable
-except ImportError:
-    from collections import Iterable
+import datetime
+import decimal
+import re
+import sys
+from collections.abc import Iterable
+from io import BytesIO, StringIO
+from typing import Any, OrderedDict, TextIO
 
 import six
+from bs4 import BeautifulSoup
+
 from . import mcc
 
-odict = collections
-
-try:
-    from bs4 import BeautifulSoup
-
-    def soup_maker(fh):
-        return BeautifulSoup(fh, "html.parser")
-
-except ImportError:
-    from BeautifulSoup import BeautifulStoneSoup
-
-    soup_maker = BeautifulStoneSoup
+FileHandleType = TextIO | BytesIO
 
 
-def try_decode(string, encoding):
+def try_decode(string: bytes | str, encoding: str) -> str:
     if hasattr(string, "decode"):
-        string = string.decode(encoding)
-    return string
+        assert not isinstance(string, str)
+        return string.decode(encoding)
+    return str(string)
+
+
+def soup_maker(fh: FileHandleType) -> BeautifulSoup:
+    return BeautifulSoup(fh, "html.parser")
 
 
 def is_iterable(candidate):
-    if sys.version_info < (2, 6):
-        return hasattr(candidate, "next")
     return isinstance(candidate, Iterable)
 
 
@@ -62,11 +49,27 @@ def save_pos(fh):
 
 
 class OfxFile(object):
-    def __init__(self, fh):
+    @property
+    def headers(self) -> OrderedDict:
+        return self._headers
+
+    @headers.setter
+    def headers(self, val: OrderedDict) -> None:
+        self._headers = val
+
+    @property
+    def fh(self) -> FileHandleType:
+        return self._fh
+
+    @fh.setter
+    def fh(self, val: FileHandleType) -> None:
+        self._fh = val
+
+    def __init__(self, fh: FileHandleType):
         """
         fh should be a seekable file-like byte stream object
         """
-        self.headers = odict.OrderedDict()
+        self.headers = OrderedDict()
         self.fh = fh
 
         if not is_iterable(self.fh):
@@ -76,7 +79,7 @@ class OfxFile(object):
 
         # If the file handler is text stream, convert to bytes one:
         first = self.fh.read(1)
-        self.fh.seek(0)
+        self.fh.seek(0, 0)
         if not isinstance(first, bytes):
             self.fh = six.BytesIO(six.b(self.fh.read()))
 
@@ -87,7 +90,7 @@ class OfxFile(object):
 
     def read_headers(self):
         head_data = self.fh.read(1024 * 10)
-        head_data = head_data[: head_data.find(six.b("<"))]
+        head_data = head_data[: head_data.find(sub=six.b("<"))]
 
         for line in head_data.splitlines():
             # Newline?
@@ -105,7 +108,7 @@ class OfxFile(object):
         subsequently returns only text.
         """
         # decode the headers using ascii
-        ascii_headers = odict.OrderedDict(
+        ascii_headers = OrderedDict(
             (
                 key.decode("ascii", "replace"),
                 value.decode("ascii", "replace"),
@@ -132,12 +135,15 @@ class OfxFile(object):
         elif enc_type in ("UNICODE", "UTF-8"):
             encoding = "utf-8"
 
+        else:
+            encoding = "utf-8"
+
         codec = codecs.lookup(encoding)
 
         self.fh = codec.streamreader(self.fh)
 
         # Decode the headers using the encoding
-        self.headers = odict.OrderedDict(
+        self.headers = OrderedDict(
             (key.decode(encoding), value.decode(encoding))
             for key, value in six.iteritems(self.headers)
         )
@@ -153,8 +159,8 @@ class OfxFile(object):
 
 
 class OfxPreprocessedFile(OfxFile):
-    def __init__(self, fh):
-        super(OfxPreprocessedFile, self).__init__(fh)
+    def __init__(self, fh: FileHandleType):
+        super().__init__(fh)
 
         if self.fh is None:
             return
@@ -194,6 +200,31 @@ class Ofx(object):
     def __str__(self):
         return ""
 
+    @property
+    def headers(self) -> str:
+        return self._headers
+
+    @headers.setter
+    def headers(self, val: str) -> None:
+        self._headers = val
+
+    @property
+    def account(self) -> "Account":
+        return self._account
+
+    @account.setter
+    def account(self, val: "Account") -> None:
+        self._account = val
+
+
+    @property
+    def accounts(self) -> list["Account"]:
+        return self._accounts
+
+    @accounts.setter
+    def accounts(self, val: list["Account"]) -> None:
+        self._accounts = val
+
 
 #        headers = "\r\n".join(":".join(el if el else "NONE" for el in item)
 #        for item in six.iteritems(self.headers))
@@ -208,16 +239,16 @@ class AccountType(object):
 
 class Account(object):
     def __init__(self):
-        self.curdef = None
-        self.statement = None
-        self.account_id = ""
-        self.routing_number = ""
-        self.branch_id = ""
-        self.account_type = ""
-        self.institution = None
-        self.type = AccountType.Unknown
+        self.curdef: str | None = None
+        self.statement: Statement | None = None
+        self.account_id: str = ""
+        self.routing_number: str = ""
+        self.branch_id: str = ""
+        self.account_type: str = ""
+        self.institution: Institution | None = None
+        self.type: AccountType = AccountType.Unknown
         # Used for error tracking
-        self.warnings = []
+        self.warnings: list[Any] = []
 
     @property
     def number(self):
@@ -290,38 +321,41 @@ class Signon:
         return ret
 
 
+DiscardedEntry = dict[str, Any]
+
+
 class Statement(object):
     def __init__(self):
-        self.start_date = ""
-        self.end_date = ""
-        self.currency = ""
-        self.transactions = []
+        self.start_date: str | None = ""
+        self.end_date: str | None = ""
+        self.currency: str | None = ""
+        self.transactions: list[Transaction] = []
         # Error tracking:
-        self.discarded_entries = []
-        self.warnings = []
+        self.discarded_entries: list[DiscardedEntry] = []
+        self.warnings: list[str] = []
 
 
 class InvestmentStatement(object):
     def __init__(self):
-        self.positions = []
-        self.transactions = []
+        self.positions: list[Position] = []
+        self.transactions: list[Transaction] = []
         # Error tracking:
-        self.discarded_entries = []
+        self.discarded_entries: list[DiscardedEntry] = []
         self.warnings = []
 
 
 class Transaction(object):
     def __init__(self):
-        self.payee = ""
-        self.type = ""
-        self.date = None
-        self.user_date = None
-        self.amount = None
-        self.id = ""
-        self.memo = ""
-        self.sic = None
-        self.mcc = ""
-        self.checknum = ""
+        self.payee: str | None = ""
+        self.tran_type: str | None = ""
+        self.date: datetime.datetime | None = None
+        self.user_date: datetime.datetime | None = None
+        self.amount: decimal.Decimal | None = None
+        self.id: str | None = ""
+        self.memo: str | None = ""
+        self.sic: str | None = None
+        self.mcc: str | None = ""
+        self.checknum: str | None = ""
 
     def __repr__(self):
         return "<Transaction units=" + str(self.amount) + ">"
