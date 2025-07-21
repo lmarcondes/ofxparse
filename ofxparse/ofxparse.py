@@ -1,12 +1,13 @@
 from __future__ import absolute_import
 
-import sys
-import decimal
-import datetime
 import codecs
-import re
 import collections
 import contextlib
+import datetime
+import decimal
+import re
+import sys
+from io import BytesIO
 
 try:
     from StringIO import StringIO
@@ -19,6 +20,7 @@ except ImportError:
     from collections import Iterable
 
 import six
+
 from . import mcc
 
 odict = collections
@@ -78,7 +80,7 @@ class OfxFile(object):
         first = self.fh.read(1)
         self.fh.seek(0)
         if not isinstance(first, bytes):
-            self.fh = six.BytesIO(six.b(self.fh.read()))
+            self.fh = BytesIO(bytes(self.fh.read()))
 
         with save_pos(self.fh):
             self.read_headers()
