@@ -134,6 +134,9 @@ class OfxFile(object):
         elif enc_type in ("UNICODE", "UTF-8"):
             encoding = "utf-8"
 
+        else:
+            encoding = 'utf-8'
+
         codec = codecs.lookup(encoding)
 
         self.fh = codec.streamreader(self.fh)
